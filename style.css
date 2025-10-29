@@ -1,0 +1,68 @@
+body{
+font-family: Arial, sans-serif;
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+  margin-top: 100px;
+  background-color:#a4193d;
+  color: #ffdfb9;
+
+}
+
+#registBT {
+  padding: 15px 25px;
+  font-size: 18px;
+  font-weight: bold;
+  background-color: #ffdfb9;
+  color: #a4193d;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#registBT:hover {
+  background-color: rgb(99, 255, 15);
+}
+
+#registerBtn {
+  padding: 15px 25px;
+  font-size: 18px;
+  font-weight: bold;
+  background-color: #ffdfb9;
+  color: #a4193d;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#registerBtn:hover {
+  background-color: rgb(99, 255, 15);
+}
+/* Окно регистрации */
+.modal-content {
+  background-color: #a4193d;
+  padding: 20px;
+  border-radius: 10px;
+  width: 50%; /* половина страницы */
+  max-width: 500px;
+  text-align: center;
+}
+
+/* Поля ввода */
+.modal-content input {
+  width: 80%;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0,0,0,0.6);
+}
