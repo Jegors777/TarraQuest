@@ -1,46 +1,56 @@
+html, body {
+  height: 90%; /* чтобы фон занимал весь экран */
+  margin: 0;    /* убираем отступы браузера */
+  padding: 0;
+}
 body{
 font-family: Arial, sans-serif;
   text-align: center;
   font-size: 20px;
   font-weight: bold;
   margin-top: 100px;
-  background-color:#a4193d;
-  color: #ffdfb9;
+  color: #000000;
+  background-image: url("tarraquest.png");
 
+  /* 👇 Делаем картинку фоном на весь экран */
+  background-size: cover;       /* Растягивает на весь экран */
+  background-position: center;  /* Центрирует */
+  background-repeat: no-repeat; /* Без повторов */
 }
+
 
 #registBT {
   padding: 15px 25px;
   font-size: 18px;
   font-weight: bold;
-  background-color: #ffdfb9;
-  color: #a4193d;
+  background-color: rgb(99, 255, 15);
+  color: #000000;
   border: none;
   border-radius: 5px;
   cursor: pointer;
 }
 
 #registBT:hover {
-  background-color: rgb(99, 255, 15);
+  background-color: rgb(24, 68, 0);
 }
 
 #registerBtn {
   padding: 15px 25px;
   font-size: 18px;
   font-weight: bold;
-  background-color: #ffdfb9;
-  color: #a4193d;
+  background-color: rgb(99, 255, 15);
+  color: #000000;
   border: none;
   border-radius: 5px;
   cursor: pointer;
 }
 
 #registerBtn:hover {
-  background-color: rgb(99, 255, 15);
+  background-color: rgb(22, 130, 0);
 }
 /* Окно регистрации */
 .modal-content {
-  background-color: #a4193d;
+  background-color: rgb(24, 68, 0);
   padding: 20px;
   border-radius: 10px;
   width: 50%; /* половина страницы */
@@ -64,5 +74,5 @@ font-family: Arial, sans-serif;
   inset: 0;
   justify-content: center;
   align-items: center;
-  background: rgba(0,0,0,0.6);
+  background: rgba(255, 255, 255, 0.6);
 }
