@@ -13,22 +13,8 @@ openBtn.onclick = async () => {
   successMsg.style.display = 'none';
 
   const CLIENT_ID = '325773790895-3lm9397je2n0lso2nbdds8qopghf3djm.apps.googleusercontent.com';
-  
-function handleCredentialResponse(response) {
-  console.log('Google credential:', response.credential);
 
-  fetch('http://localhost:3000/auth/google', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id_token: response.credential })
-  })
-  .then(r => {
-    console.log('Ответ сервера:', r.status);
-    return r.json();
-  })
-  .then(console.log)
-  .catch(err => console.error('Ошибка запроса:', err));
-}
+  // ЕДИНСТВЕННАЯ функция для callback Google
   function handleCredentialResponse(response) {
     fetch('http://localhost:3000/auth/google', {
       method: 'POST',
@@ -38,17 +24,25 @@ function handleCredentialResponse(response) {
     .then(r => r.json())
     .then(data => {
       if (data.success) {
+        // Показываем сообщение (по желанию)
         successMsg.style.display = 'block';
-        successMsg.textContent = `You rigestred like ${data.user.name} (${data.user.email}) ✅`;
+        successMsg.style.color = 'green';
+        successMsg.textContent = `You are logged in as ${data.user.name} (${data.user.email}) ✅`;
+
+        // Редирект на welcome.html всегда
+        setTimeout(() => {
+          window.location.href = 'welcome.html';
+        }, 500); // 0.5 сек
       } else {
         successMsg.style.display = 'block';
         successMsg.style.color = 'red';
-        successMsg.textContent = data.error || 'Error ';
+        successMsg.textContent = data.error || 'Error';
       }
     })
     .catch(err => console.error(err));
   }
 
+  // Ждём, пока google.accounts.id подгрузится
   const waitForGoogle = setInterval(() => {
     if (window.google && google.accounts && google.accounts.id) {
       clearInterval(waitForGoogle);
@@ -63,6 +57,7 @@ function handleCredentialResponse(response) {
     }
   }, 300);
 
+  // Закрытие модалки при клике вне
   window.onclick = (e) => {
     if (e.target === modal) modal.style.display = 'none';
   };

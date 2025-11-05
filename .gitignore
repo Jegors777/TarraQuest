@@ -1,0 +1,5 @@
+# Node.js модули
+node_modules/
+
+# Локальная база данных SQLite
+database.db
