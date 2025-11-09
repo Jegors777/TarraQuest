@@ -1,76 +1,64 @@
-const express = require('express');
-const { OAuth2Client } = require('google-auth-library');
-const cors = require('cors');
-const db = require('./db'); // подключаем базу
+import express from 'express';
+import multer from 'multer';
+import Tesseract from 'tesseract.js';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+const upload = multer({ dest: 'uploads/' });
 
-app.use(express.static(__dirname));
+const DB_FILE = path.join('./', 'receipts.json');
 
-// Токен CLIENT_ID из Google Cloud Console
-const CLIENT_ID = '325773790895-3lm9397je2n0lso2nbdds8qopghf3djm.apps.googleusercontent.com';
-const client = new OAuth2Client(CLIENT_ID);
-
-
-app.post('/auth/google', async (req, res) => {
-  const { id_token } = req.body;
-  if (!id_token) return res.status(400).json({ error: 'No token provided' });
-
+function readDB() {
   try {
-    // Проверяем токен Google
-    const ticket = await client.verifyIdToken({
-      idToken: id_token,
-      audience: CLIENT_ID,
-    });
-    const payload = ticket.getPayload(); // содержит email, name, sub (Google ID)
+    const data = fs.readFileSync(DB_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
 
-    const { sub: googleId, email, name } = payload;
+function writeDB(data) {
+  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+}
 
-    // Проверяем, есть ли уже пользователь в базе
-    db.get('SELECT * FROM users WHERE googleId = ?', [googleId], (err, user) => {
-      if (err) return res.status(500).json({ error: 'DB error' });
+app.post('/upload', upload.single('receipt'), async (req, res) => {
+  try {
+    const imagePath = req.file.path;
 
-      if (user) {
-        return res.json({ success: true, user });
-      } else {
-        // Считаем пользователей — ограничение 5
-        db.get('SELECT COUNT(*) AS count FROM users', (err, row) => {
-          if (err) return res.status(500).json({ error: 'DB error' });
+    const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
+    console.log('Atpazītais teksts:', text);
 
-          if (row.count >= 5) {
-            return res.status(403).json({ error: 'Limit of 5 users reached' });
-          }
+    const amountMatch = text.match(/(\d+[.,]\d{2})\s?(EUR|€)?/);
+    const dateMatch = text.match(/\d{2}[./-]\d{2}[./-]\d{4}/);
 
-          // Добавляем нового
-          db.run(
-            'INSERT INTO users (googleId, email, name) VALUES (?, ?, ?)',
-            [googleId, email, name],
-            function (err) {
-              if (err) return res.status(500).json({ error: 'Insert error' });
-              res.json({ success: true, user: { id: this.lastID, googleId, email, name } });
-            }
-          );
-        });
-      }
-    });
+    const amount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.')) : null;
+    const date = dateMatch ? dateMatch[0] : null;
+
+    fs.unlinkSync(imagePath);
+
+    if (!amount || !date) {
+      return res.json({ success: false, error: 'Neizdevās nolasīt čeka summu vai datumu.' });
+    }
+
+    const db = readDB();
+    const duplicate = db.find(item => item.amount === amount && item.date === date);
+
+    if (duplicate) {
+      return res.json({ success: false, error: 'Šis čeks jau ir reģistrēts.' });
+    }
+
+    db.push({ amount, date });
+    writeDB(db);
+
+    res.json({ success: true, amount, date });
+
   } catch (err) {
-    console.error(err);
-    res.status(401).json({ error: 'Invalid token' });
+    console.error('Kļūda apstrādājot čeku:', err);
+    res.json({ success: false, error: 'Servera kļūda OCR procesā.' });
   }
 });
 
-app.get('/users', (req, res) => {
-  db.all('SELECT * FROM users', (err, rows) => {
-    if (err) return res.status(500).json({ error: 'DB error' });
-    res.json(rows);
-  });
-});
-
-app.get('/', (req, res) => {
-  res.redirect('/users'); // теперь при заходе на / — покажет список пользователей
-});
-
-app.listen(3000, () => console.log('✅ Server running on http://localhost:3000'));
-
+app.listen(3000, () => console.log('✅ Serveris darbojas uz http://localhost:3000'));
