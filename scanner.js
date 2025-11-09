@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 const form = document.getElementById('receiptForm');
 const input = document.getElementById('receiptInput');
 const resultText = document.getElementById('result');
@@ -39,11 +39,6 @@ form.addEventListener('submit', async (e) => {
     resultText.className = "error";
   }
 });
-=======
-const form = document.getElementById('receiptForm');
-const input = document.getElementById('receiptInput');
-const resultText = document.getElementById('result');
-
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -80,4 +75,3 @@ form.addEventListener('submit', async (e) => {
     resultText.className = "error";
   }
 });
->>>>>>> cc08238 (apvenots registracija ar ceku scanneri)

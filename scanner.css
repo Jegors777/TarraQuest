@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 body {
 font-family: Arial, sans-serif;
   background-color: rgb(22, 130, 0);  display: flex;
@@ -75,7 +75,7 @@ a.back-link {
 
 a.back-link:hover {
   text-decoration: underline;
-=======
+}
 body {
 font-family: Arial, sans-serif;
   background-color: rgb(22, 130, 0);  display: flex;
@@ -152,5 +152,4 @@ a.back-link {
 
 a.back-link:hover {
   text-decoration: underline;
->>>>>>> cc08238 (apvenots registracija ar ceku scanneri)
 }
