@@ -17,3 +17,17 @@ font-family: Arial, sans-serif;
   background-position: center;  
   background-repeat: no-repeat; 
 }
+
+#RegCek {
+  padding: 15px 25px;
+  font-size: 18px;
+  font-weight: bold;
+  background-color: rgb(99, 255, 15);
+  color: #000000;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+#RegCek:hover {
+  background-color: rgb(24, 68, 0);
+}
