@@ -1,3 +1,5 @@
+
+// === Importi ===
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -11,7 +13,7 @@ import sqlite3 from 'sqlite3';
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.resolve('.')));
+app.use(express.static(path.resolve('.'))); // lai apkalpotu HTML un CSS failus
 
 // === SQLite datubāzes iestatīšana ===
 const db = new sqlite3.Database('database.db', (err) => {
