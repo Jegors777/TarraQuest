@@ -75,3 +75,9 @@ form.addEventListener('submit', async (e) => {
     resultText.className = "error";
   }
 });
+
+// Pogas
+const LeaderBT = document.getElementById('LeaderBT')
+LeaderBT.onclick = () => {
+  window.location.href = 'leaderboard.html';
+};

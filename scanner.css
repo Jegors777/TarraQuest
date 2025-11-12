@@ -153,3 +153,23 @@ a.back-link {
 a.back-link:hover {
   text-decoration: underline;
 }
+/*Pogas*/
+
+#LeaderBT {
+  position: fixed;   /* Позволяет точно задать место */
+  top: 0px;             /* Отступ сверху */
+  left: 10px;            /* Отступ слева */
+  
+  padding: 15px 25px;
+  font-size: 18px;
+  font-weight: bold;
+  background-color: rgb(99, 255, 15);
+  color: #000000;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+#LeaderBT:hover {
+  background-color: rgb(24, 68, 0);
+}

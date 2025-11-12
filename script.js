@@ -29,9 +29,9 @@ openBtn.onclick = async () => {
         successMsg.style.color = 'green';
         successMsg.textContent = `You are logged in as ${data.user.name} (${data.user.email}) ✅`;
 
-        // Редирект на welcome.html всегда
+        // Редирект на scanner.html всегда
         setTimeout(() => {
-          window.location.href = 'welcome.html';
+          window.location.href = 'scanner.html';
         }, 500); // 0.5 сек
       } else {
         successMsg.style.display = 'block';
