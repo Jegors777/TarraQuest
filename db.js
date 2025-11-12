@@ -19,4 +19,19 @@ db.serialize(() => {
   `);
 });
 
+//Čekiem
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS checks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER,
+      shop TEXT,
+      total REAL,
+      points INTEGER,
+      date TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY(userId) REFERENCES users(id)
+    )
+  `);
+});
+
 module.exports = db;

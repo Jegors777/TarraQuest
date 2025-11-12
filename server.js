@@ -1,4 +1,3 @@
-
 // === Importi ===
 import express from 'express';
 import cors from 'cors';
@@ -7,28 +6,13 @@ import Tesseract from 'tesseract.js';
 import fs from 'fs';
 import path from 'path';
 import { OAuth2Client } from 'google-auth-library';
-import sqlite3 from 'sqlite3';
+import db from './db.js'; // подключаем твой db.js
 
 // === Express inicializācija ===
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.resolve('.'))); // lai apkalpotu HTML un CSS failus
-
-// === SQLite datubāzes iestatīšana ===
-const db = new sqlite3.Database('database.db', (err) => {
-  if (err) console.error('❌ Kļūda, pieslēdzoties datubāzei:', err);
-  else console.log('✅ Pievienots SQLite datubāzei');
-});
-
-db.run(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    googleId TEXT UNIQUE,
-    email TEXT,
-    name TEXT
-  )
-`);
+app.use(express.static(path.resolve('.')));
 
 // === Google OAuth2 iestatīšana ===
 const CLIENT_ID = '325773790895-3lm9397je2n0lso2nbdds8qopghf3djm.apps.googleusercontent.com';
@@ -78,22 +62,31 @@ app.post('/auth/google', async (req, res) => {
   }
 });
 
-// === OCR /upload (čeku atpazīšana) ===
+// === OCR /upload ===
 const upload = multer({ dest: 'uploads/' });
-const RECEIPT_DB = path.join('./', 'receipts.json');
 
-function readReceipts() {
-  try {
-    return JSON.parse(fs.readFileSync(RECEIPT_DB, 'utf-8'));
-  } catch {
-    return [];
-  }
+// === Функция для сохранения чека пользователя ===
+function saveCheckForUser(googleId, amount, shop = '') {
+  const points = Math.round(amount * 10);
+
+  db.get('SELECT id FROM users WHERE googleId = ?', [googleId], (err, row) => {
+    if (err) return console.error(err);
+    if (!row) return console.error('Пользователь не найден');
+
+    const userId = row.id;
+
+    db.run(
+      `INSERT INTO checks (userId, shop, total, points, date) VALUES (?, ?, ?, ?, datetime('now'))`,
+      [userId, shop, amount, points],
+      function(err) {
+        if (err) console.error(err);
+        else console.log(`Čeks saglabāt priekš lietotāja ${googleId}: ${amount}€, ${points} points`);
+      }
+    );
+  });
 }
 
-function writeReceipts(data) {
-  fs.writeFileSync(RECEIPT_DB, JSON.stringify(data, null, 2));
-}
-
+// === Маршрут загрузки чека ===
 app.post('/upload', upload.single('receipt'), async (req, res) => {
   try {
     const imagePath = req.file.path;
@@ -101,29 +94,23 @@ app.post('/upload', upload.single('receipt'), async (req, res) => {
     const { data: { text } } = await Tesseract.recognize(imagePath, 'lav+eng');
     console.log('📄 Atpazītais teksts:', text);
 
-    const amountMatch = text.match(/(\d+[.,]\d{2})\s?(EUR|€)?/);
-    const dateMatch = text.match(/\d{2}[./-]\d{2}[./-]\d{4}/);
-
+    // Ищем число, похожее на сумму, но не часть даты
+    const amountMatch = text.match(/(\d{1,4}[.,]\d{1,2})/);
+    const shopMatch = text.match(/Veikals\s*([A-Za-z0-9\s]+)/i); // простая попытка распознать название магазина
     const amount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.')) : null;
-    const date = dateMatch ? dateMatch[0] : null;
+    const shop = shopMatch ? shopMatch[1].trim() : '';
 
     fs.unlinkSync(imagePath);
 
-    if (!amount || !date) {
-      return res.json({ success: false, error: 'Neizdevās nolasīt summu vai datumu.' });
-    }
+    if (!amount) return res.json({ success: false, error: 'Neizdevās nolasīt summu.' });
 
-    const dbData = readReceipts();
-    const duplicate = dbData.find(item => item.amount === amount && item.date === date);
+    const { googleId } = req.body;
+    if (!googleId) return res.json({ success: false, error: 'Nav norādīts lietotājs.' });
+    console.log('req.body:', req.body); // <-- чтобы увидеть, что приходит
 
-    if (duplicate) {
-      return res.json({ success: false, error: 'Šis čeks jau ir reģistrēts.' });
-    }
+    saveCheckForUser(googleId, amount, shop);
 
-    dbData.push({ amount, date });
-    writeReceipts(dbData);
-
-    res.json({ success: true, amount, date });
+    res.json({ success: true, amount, points: Math.round(amount * 10), shop });
 
   } catch (err) {
     console.error('❌ OCR kļūda:', err);
@@ -131,11 +118,21 @@ app.post('/upload', upload.single('receipt'), async (req, res) => {
   }
 });
 
-// === Lietotāju pārbaude ===
-app.get('/users', (req, res) => {
-  db.all('SELECT * FROM users', (err, rows) => {
+// === Получение всех чеков пользователя ===
+app.get('/user/checks', (req, res) => {
+  const googleId = req.query.googleId;
+  if (!googleId) return res.status(400).json({ error: 'Nav norādīts lietotājs.' });
+
+  db.get('SELECT id FROM users WHERE googleId = ?', [googleId], (err, row) => {
     if (err) return res.status(500).json({ error: 'Datubāzes kļūda' });
-    res.json(rows);
+    if (!row) return res.status(404).json({ error: 'Lietotājs nav atrasts' });
+
+    const userId = row.id;
+
+    db.all('SELECT * FROM checks WHERE userId = ? ORDER BY date DESC', [userId], (err, rows) => {
+      if (err) return res.status(500).json({ error: 'Datubāzes kļūda' });
+      res.json(rows);
+    });
   });
 });
 

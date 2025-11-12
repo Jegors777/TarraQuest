@@ -14,7 +14,7 @@ openBtn.onclick = async () => {
 
   const CLIENT_ID = '325773790895-3lm9397je2n0lso2nbdds8qopghf3djm.apps.googleusercontent.com';
 
-  // ЕДИНСТВЕННАЯ функция для callback Google
+  // callback Google
   function handleCredentialResponse(response) {
     fetch('http://localhost:3000/auth/google', {
       method: 'POST',
@@ -24,15 +24,18 @@ openBtn.onclick = async () => {
     .then(r => r.json())
     .then(data => {
       if (data.success) {
-        // Показываем сообщение (по желанию)
+        // Сохраняем пользователя в localStorage
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        // Показываем сообщение
         successMsg.style.display = 'block';
         successMsg.style.color = 'green';
-        successMsg.textContent = `You are logged in as ${data.user.name} (${data.user.email}) ✅`;
+        successMsg.textContent = `Logged in as ${data.user.name} (${data.user.email}) ✅`;
 
-        // Редирект на scanner.html всегда
+        // Редирект на scanner.html
         setTimeout(() => {
           window.location.href = 'scanner.html';
-        }, 500); // 0.5 сек
+        }, 500);
       } else {
         successMsg.style.display = 'block';
         successMsg.style.color = 'red';
