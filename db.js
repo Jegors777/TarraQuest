@@ -1,4 +1,6 @@
-const sqlite3 = require('sqlite3').verbose();
+// db.js
+import sqlite3 from 'sqlite3';
+sqlite3.verbose();
 
 const db = new sqlite3.Database('./database.db', (err) => {
   if (err) {
@@ -17,10 +19,7 @@ db.serialize(() => {
       name TEXT
     )
   `);
-});
 
-//Čekiem
-db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS checks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,4 +33,4 @@ db.serialize(() => {
   `);
 });
 
-module.exports = db;
+export default db;
