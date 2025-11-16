@@ -86,7 +86,11 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-// Кнопка Leaderboard
+// Pogas 
 document.getElementById('LeaderBT').onclick = () => {
   window.location.href = 'leaderboard.html';
+};
+
+document.getElementById('ParMumsBT').onclick = () => {
+  window.location.href = 'parmums.html';
 };
