@@ -69,7 +69,7 @@ form.addEventListener('submit', async (e) => {
     const data = await res.json();
 
     if (data.success) {
-      resultText.textContent = `✅ Čeks pievienots! Summa: €${data.amount.toFixed(2)} | Punkti: ${data.points} | Veikals: ${data.shop}`;
+      resultText.textContent = `✅ Čeks pievienots! Summa: €${data.amount.toFixed(2)} | Punkti: ${data.points}`;
       resultText.className = "success";
       input.value = "";
 
