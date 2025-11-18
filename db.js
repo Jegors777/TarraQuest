@@ -1,50 +1,38 @@
-// db.js
-import pkg from 'pg';
-const { Pool } = pkg;
+import sqlite3 from 'sqlite3';
+sqlite3.verbose();
 
-// Используем DATABASE_URL для продакшена (Neon/Render)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false // обязательно для Neon
-  }
+const db = new sqlite3.Database('./database.db', (err) => {
+    if (err) {
+        console.error('❌ Kļūda pieslēdzoties datubāzei:', err);
+    } else {
+        console.log('✅ Pieslēgts SQLite datubāzei');
+    }
 });
 
-// Логи соединения
-pool.on('connect', () => console.log('🟢 Connected to PostgreSQL'));
-pool.on('error', (err) => console.error('🔴 PostgreSQL error:', err));
+db.serialize(() => {
 
-// Создание таблиц при старте
-export const createTables = async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        googleId TEXT UNIQUE,
-        email TEXT,
-        name TEXT
-      );
+    db.run(`
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            googleId TEXT UNIQUE,
+            email TEXT,
+            name TEXT
+        )
     `);
 
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS checks (
-        id SERIAL PRIMARY KEY,
-        userId INTEGER REFERENCES users(id),
-        shop TEXT,
-        total REAL,
-        points INTEGER,
-        hash TEXT,
-        date TIMESTAMP DEFAULT NOW()
-      );
+    db.run(`
+        CREATE TABLE IF NOT EXISTS checks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            userId INTEGER,
+            shop TEXT,
+            total REAL,
+            points INTEGER,
+            hash TEXT,
+            date TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY(userId) REFERENCES users(id)
+        )
     `);
 
-    console.log("✔ Tables ensured");
-  } catch (err) {
-    console.error("❌ Failed creating tables:", err);
-  }
-};
+});
 
-// Создание таблиц сразу при импорте
-createTables();
-
-export default pool;
+export default db;
