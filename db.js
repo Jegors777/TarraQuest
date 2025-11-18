@@ -1,37 +1,49 @@
+import pkg from 'pg';
+const { Pool } = pkg;
 
-import sqlite3 from 'sqlite3';
-sqlite3.verbose();
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-const db = new sqlite3.Database('./database.db', (err) => {
-  if (err) {
-    console.error('❌ "Kļūda pieslēdzoties datubāzei":', err);
-  } else {
-    console.log('✅ "Pieslēgts SQLite datubāzei"');
+pool.on('connect', () => {
+  console.log('🟢 Connected to PostgreSQL');
+});
+
+pool.on('error', (err) => {
+  console.error('🔴 PostgreSQL error:', err);
+});
+
+// Создание таблиц при старте
+const createTables = async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        googleId TEXT UNIQUE,
+        email TEXT,
+        name TEXT
+      );
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS checks (
+        id SERIAL PRIMARY KEY,
+        userId INTEGER REFERENCES users(id),
+        shop TEXT,
+        total REAL,
+        points INTEGER,
+        hash TEXT,
+        date TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    console.log("✔ Tables ensured");
+  } catch (err) {
+    console.error("❌ Failed creating tables:", err);
   }
-});
+};
 
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      googleId TEXT UNIQUE,
-      email TEXT,
-      name TEXT
-    )
-  `);
+createTables();
 
-  db.run(`
-    CREATE TABLE IF NOT EXISTS checks (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId INTEGER,
-      shop TEXT,
-      total REAL,
-      points INTEGER,
-      hash TEXT,
-      date TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY(userId) REFERENCES users(id)
-    )
-  `);
-});
-
-export default db;
+export default pool;
