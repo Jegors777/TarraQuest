@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import db from './db.js'; // здесь db — это клиент pg (например, Pool из 'pg')
+import db from './db.js'; // PostgreSQL Pool
 
 // === Express inicializācija ===
 const app = express();
@@ -32,17 +32,12 @@ app.post('/auth/google', async (req, res) => {
 
     const { sub: googleId, email, name } = ticket.getPayload();
 
-    // Проверка: есть ли юзер в базе
-    const existing = await db.query(
-      'SELECT * FROM users WHERE googleId = $1',
-      [googleId]
-    );
+    const existing = await db.query('SELECT * FROM users WHERE googleId = $1', [googleId]);
 
     if (existing.rows.length > 0) {
       return res.json({ success: true, user: existing.rows[0] });
     }
 
-    // Проверка лимита: 5 пользователей
     const countRes = await db.query('SELECT COUNT(*) FROM users');
     const count = Number(countRes.rows[0].count);
 
@@ -50,7 +45,6 @@ app.post('/auth/google', async (req, res) => {
       return res.status(403).json({ error: 'Sasniegts 5 lietotāju limits' });
     }
 
-    // Создание пользователя
     const insert = await db.query(
       'INSERT INTO users (googleId, email, name) VALUES ($1, $2, $3) RETURNING *',
       [googleId, email, name]
@@ -67,50 +61,50 @@ app.post('/auth/google', async (req, res) => {
 // === OCR /upload ===
 const upload = multer({ dest: 'uploads/' });
 
-// === Функция для вычисления хэша файла ===
+// === Хэш файла ===
 function getFileHash(filePath) {
   const fileBuffer = fs.readFileSync(filePath);
   return crypto.createHash('md5').update(fileBuffer).digest('hex');
 }
 
-// === Функция для сохранения чека пользователя ===
+// === Сохранение чека ===
 async function saveCheckForUser(userId, amount, shop = '', hash) {
-  const points = Math.round(amount * 10);
+  const numericAmount = Number(amount);
+  if (isNaN(numericAmount)) throw new Error('Invalid amount');
+
+  const points = Math.round(numericAmount * 10);
 
   await db.query(
     `INSERT INTO checks (userId, shop, total, points, hash)
      VALUES ($1, $2, $3, $4, $5)`,
-    [userId, shop, amount, points, hash]
+    [userId, shop, numericAmount, points, hash]
   );
 
-  console.log(`Čeks saglabāts priekš lietotāja ${userId}: ${amount}€, ${points} punkti`);
+  console.log(`Čeks saglabāts priekš lietotāja ${userId}: ${numericAmount}€, ${points} punkti`);
+  return points;
 }
 
 // === Маршрут загрузки чека ===
 app.post('/upload', upload.single('receipt'), async (req, res) => {
   try {
     const imagePath = req.file.path;
-
     const { data: { text } } = await Tesseract.recognize(imagePath, 'lav+eng');
 
+    // Чистый парсинг суммы
     const amountMatch = text.match(/(\d{1,4}[.,]\d{1,2})/);
-    const shopMatch = text.match(/Veikals\s*([A-Za-z0-9\s]+)/i);
+    const amountText = amountMatch ? amountMatch[1].replace(/[^\d,\.]/g, '').replace(',', '.') : null;
+    const amount = amountText ? parseFloat(amountText) : null;
 
-    const amount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.')) : null;
+    const shopMatch = text.match(/Veikals\s*([A-Za-z0-9\s]+)/i);
     const shop = shopMatch ? shopMatch[1].trim() : '';
 
-    if (!amount) {
+    if (!amount || isNaN(amount)) {
       fs.unlinkSync(imagePath);
       return res.json({ success: false, error: 'Neizdevās nolasīt summu.' });
     }
 
     const { googleId } = req.body;
-
-    // Находим userId
-    const userRes = await db.query(
-      'SELECT id FROM users WHERE googleId = $1',
-      [googleId]
-    );
+    const userRes = await db.query('SELECT id FROM users WHERE googleId = $1', [googleId]);
 
     if (userRes.rows.length === 0) {
       fs.unlinkSync(imagePath);
@@ -120,21 +114,15 @@ app.post('/upload', upload.single('receipt'), async (req, res) => {
     const userId = userRes.rows[0].id;
     const hash = getFileHash(imagePath);
 
-    // Проверяем дубль чека
-    const existing = await db.query(
-      'SELECT * FROM checks WHERE userId = $1 AND hash = $2',
-      [userId, hash]
-    );
-
+    const existing = await db.query('SELECT * FROM checks WHERE userId = $1 AND hash = $2', [userId, hash]);
     fs.unlinkSync(imagePath);
 
     if (existing.rows.length > 0) {
       return res.json({ success: false, error: 'Šis čeks jau ir augšupielādēts.' });
     }
 
-    await saveCheckForUser(userId, amount, shop, hash);
-
-    res.json({ success: true, amount, points: Math.round(amount * 10), shop });
+    const points = await saveCheckForUser(userId, amount, shop, hash);
+    res.json({ success: true, amount, points, shop });
 
   } catch (err) {
     console.error('❌ OCR kļūda:', err);
@@ -147,22 +135,11 @@ app.get('/user/checks', async (req, res) => {
   const googleId = req.query.googleId;
   if (!googleId) return res.status(400).json({ error: 'Nav norādīts lietotājs.' });
 
-  const userRes = await db.query(
-    'SELECT id FROM users WHERE googleId = $1',
-    [googleId]
-  );
-
-  if (userRes.rows.length === 0) {
-    return res.status(404).json({ error: 'Lietotājs nav atrasts' });
-  }
+  const userRes = await db.query('SELECT id FROM users WHERE googleId = $1', [googleId]);
+  if (userRes.rows.length === 0) return res.status(404).json({ error: 'Lietotājs nav atrasts' });
 
   const userId = userRes.rows[0].id;
-
-  const checks = await db.query(
-    'SELECT * FROM checks WHERE userId = $1 ORDER BY date DESC',
-    [userId]
-  );
-
+  const checks = await db.query('SELECT * FROM checks WHERE userId = $1 ORDER BY date DESC', [userId]);
   res.json(checks.rows);
 });
 
