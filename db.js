@@ -2,26 +2,19 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 
-// ===== Настройки подключения к локальной базе =====
-// Замените эти значения на свои
+// Используем DATABASE_URL для продакшена (Neon/Render)
 const pool = new Pool({
-  user: 'postgres',          // ваш пользователь PostgreSQL
-  host: 'localhost',         // локальный сервер
-  database: 'your_db_name',  // имя вашей базы
-  password: 'your_password', // пароль PostgreSQL
-  port: 5432                 // стандартный порт PostgreSQL
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false // обязательно для Neon
+  }
 });
 
-// ===== Логи соединения =====
-pool.on('connect', () => {
-  console.log('🟢 Connected to PostgreSQL');
-});
+// Логи соединения
+pool.on('connect', () => console.log('🟢 Connected to PostgreSQL'));
+pool.on('error', (err) => console.error('🔴 PostgreSQL error:', err));
 
-pool.on('error', (err) => {
-  console.error('🔴 PostgreSQL error:', err);
-});
-
-// ===== Создание таблиц при старте =====
+// Создание таблиц при старте
 export const createTables = async () => {
   try {
     await pool.query(`
@@ -51,7 +44,7 @@ export const createTables = async () => {
   }
 };
 
-// ===== Создание таблиц сразу при импорте =====
+// Создание таблиц сразу при импорте
 createTables();
 
 export default pool;
