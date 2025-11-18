@@ -1,12 +1,12 @@
-// db.js
+
 import sqlite3 from 'sqlite3';
 sqlite3.verbose();
 
 const db = new sqlite3.Database('./database.db', (err) => {
   if (err) {
-    console.error('❌ Ошибка подключения к базе данных:', err);
+    console.error('❌ "Kļūda pieslēdzoties datubāzei":', err);
   } else {
-    console.log('✅ Подключено к базе данных SQLite');
+    console.log('✅ "Pieslēgts SQLite datubāzei"');
   }
 });
 
@@ -27,6 +27,7 @@ db.serialize(() => {
       shop TEXT,
       total REAL,
       points INTEGER,
+      hash TEXT,
       date TEXT DEFAULT (datetime('now')),
       FOREIGN KEY(userId) REFERENCES users(id)
     )

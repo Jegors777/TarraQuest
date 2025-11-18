@@ -5,8 +5,9 @@ import multer from 'multer';
 import Tesseract from 'tesseract.js';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import db from './db.js'; // подключаем твой db.js
+import db from './db.js';
 
 // === Express inicializācija ===
 const app = express();
@@ -65,25 +66,24 @@ app.post('/auth/google', async (req, res) => {
 // === OCR /upload ===
 const upload = multer({ dest: 'uploads/' });
 
+// === Функция для вычисления хэша файла ===
+function getFileHash(filePath) {
+  const fileBuffer = fs.readFileSync(filePath);
+  return crypto.createHash('md5').update(fileBuffer).digest('hex');
+}
+
 // === Функция для сохранения чека пользователя ===
-function saveCheckForUser(googleId, amount, shop = '') {
+function saveCheckForUser(userId, amount, shop = '', hash) {
   const points = Math.round(amount * 10);
 
-  db.get('SELECT id FROM users WHERE googleId = ?', [googleId], (err, row) => {
-    if (err) return console.error(err);
-    if (!row) return console.error('Пользователь не найден');
-
-    const userId = row.id;
-
-    db.run(
-      `INSERT INTO checks (userId, shop, total, points, date) VALUES (?, ?, ?, ?, datetime('now'))`,
-      [userId, shop, amount, points],
-      function(err) {
-        if (err) console.error(err);
-        else console.log(`Čeks saglabāt priekš lietotāja ${googleId}: ${amount}€, ${points} points`);
-      }
-    );
-  });
+  db.run(
+    `INSERT INTO checks (userId, shop, total, points, hash, date) VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+    [userId, shop, amount, points, hash],
+    function(err) {
+      if (err) console.error('❌ Kļūda saglabājot čeku:', err);
+      else console.log(`Čeks saglabāts priekš lietotāja ${userId}: ${amount}€, ${points} punkti`);
+    }
+  );
 }
 
 // === Маршрут загрузки чека ===
@@ -94,23 +94,44 @@ app.post('/upload', upload.single('receipt'), async (req, res) => {
     const { data: { text } } = await Tesseract.recognize(imagePath, 'lav+eng');
     console.log('📄 Atpazītais teksts:', text);
 
-    // Ищем число, похожее на сумму, но не часть даты
     const amountMatch = text.match(/(\d{1,4}[.,]\d{1,2})/);
-    const shopMatch = text.match(/Veikals\s*([A-Za-z0-9\s]+)/i); // простая попытка распознать название магазина
+    const shopMatch = text.match(/Veikals\s*([A-Za-z0-9\s]+)/i);
     const amount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.')) : null;
     const shop = shopMatch ? shopMatch[1].trim() : '';
 
-    fs.unlinkSync(imagePath);
-
-    if (!amount) return res.json({ success: false, error: 'Neizdevās nolasīt summu.' });
+    if (!amount) {
+      fs.unlinkSync(imagePath);
+      return res.json({ success: false, error: 'Neizdevās nolasīt summu.' });
+    }
 
     const { googleId } = req.body;
-    if (!googleId) return res.json({ success: false, error: 'Nav norādīts lietotājs.' });
-    console.log('req.body:', req.body); // <-- чтобы увидеть, что приходит
+    if (!googleId) {
+      fs.unlinkSync(imagePath);
+      return res.json({ success: false, error: 'Nav norādīts lietotājs.' });
+    }
 
-    saveCheckForUser(googleId, amount, shop);
+    // Получаем userId
+    db.get('SELECT id FROM users WHERE googleId = ?', [googleId], (err, row) => {
+      if (err || !row) {
+        fs.unlinkSync(imagePath);
+        return res.status(404).json({ success: false, error: 'Lietotājs nav atrasts.' });
+      }
 
-    res.json({ success: true, amount, points: Math.round(amount * 10), shop });
+      const userId = row.id;
+      const hash = getFileHash(imagePath);
+
+      // Проверяем, есть ли такой чек уже
+      db.get('SELECT * FROM checks WHERE userId = ? AND hash = ?', [userId, hash], (err, existing) => {
+        fs.unlinkSync(imagePath); // удаляем файл в любом случае
+
+        if (err) return res.status(500).json({ success: false, error: 'Datubāzes kļūda' });
+        if (existing) return res.json({ success: false, error: 'Šis čeks jau ir augšupielādēts.' });
+
+        saveCheckForUser(userId, amount, shop, hash);
+
+        res.json({ success: true, amount, points: Math.round(amount * 10), shop });
+      });
+    });
 
   } catch (err) {
     console.error('❌ OCR kļūda:', err);
