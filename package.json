@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/Jegors777/TarraQuest#readme",
   "dependencies": {
+    "@libsql/client": "^0.15.15",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
