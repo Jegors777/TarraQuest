@@ -23,23 +23,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'supersecret123';
 // ---------- GOOGLE AUTH ----------
 app.post('/auth/google', async (req, res) => {
   const { id_token } = req.body;
-  if (!id_token) return res.status(400).json({ error: 'Nav nodots token' });
+  if (!id_token) return res.status(400).json({ error: 'Нет id_token' });
 
   try {
     const ticket = await GOOGLE_CLIENT.verifyIdToken({ idToken: id_token, audience: CLIENT_ID });
     const payload = ticket.getPayload();
     const { sub: googleId, email, name } = payload;
 
-    // Проверяем пользователя в БД
+    // Создаём пользователя, если его нет
     let result = await db.execute({ sql: 'SELECT * FROM users WHERE googleId = ?', args: [googleId] });
     let user;
     if (result.rows.length > 0) {
       user = result.rows[0];
     } else {
-      // Проверка лимита
-      const countResult = await db.execute({ sql: 'SELECT COUNT(*) AS count FROM users' });
-      if (countResult.rows[0].count >= 5) return res.status(403).json({ error: 'Sasniegts 5 lietotāju limits' });
-
       const insert = await db.execute({ sql: 'INSERT INTO users (googleId, email, name) VALUES (?, ?, ?)', args: [googleId, email, name] });
       user = (await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [insert.lastInsertRowid] })).rows[0];
     }
@@ -50,16 +46,16 @@ app.post('/auth/google', async (req, res) => {
     res.json({ success: true, user, token });
   } catch (err) {
     console.error('❌ Google auth error:', err);
-    res.status(401).json({ error: 'Nederīgs id_token' });
+    res.status(401).json({ error: 'Неверный id_token' });
   }
 });
 
-// ---------- Миддлвар для проверки JWT ----------
+// ---------- JWT middleware ----------
 function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
   if (!authHeader) return res.status(401).json({ error: 'No token provided' });
 
-  const token = authHeader.split(' ')[1]; // Bearer <token>
+  const token = authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'No token provided' });
 
   try {
@@ -80,10 +76,7 @@ function getFileHash(filePath) {
 
 async function saveCheckForUser(userId, amount, shop, hash) {
   const points = Math.round(amount * 10);
-  await db.execute({
-    sql: 'INSERT INTO checks (userId, shop, total, points, hash) VALUES (?, ?, ?, ?, ?)',
-    args: [userId, shop, amount, points, hash]
-  });
+  await db.execute({ sql: 'INSERT INTO checks (userId, shop, total, points, hash) VALUES (?, ?, ?, ?, ?)', args: [userId, shop, amount, points, hash] });
   return points;
 }
 
@@ -101,7 +94,7 @@ app.post('/upload', authMiddleware, upload.single('receipt'), async (req, res) =
 
     if (!amount) {
       fs.unlinkSync(imagePath);
-      return res.json({ success: false, error: 'Neizdevās nolasīt summu' });
+      return res.json({ success: false, error: 'Не удалось прочитать сумму' });
     }
 
     const userId = req.userId;
@@ -110,14 +103,14 @@ app.post('/upload', authMiddleware, upload.single('receipt'), async (req, res) =
     const existingResult = await db.execute({ sql: 'SELECT * FROM checks WHERE userId = ? AND hash = ?', args: [userId, hash] });
     fs.unlinkSync(imagePath);
 
-    if (existingResult.rows.length > 0) return res.json({ success: false, error: 'Šis čeks jau ir augšupielādēts' });
+    if (existingResult.rows.length > 0) return res.json({ success: false, error: 'Этот чек уже загружен' });
 
     const points = await saveCheckForUser(userId, amount, shop, hash);
     res.json({ success: true, amount, points, shop });
   } catch (err) {
     fs.existsSync(imagePath) && fs.unlinkSync(imagePath);
     console.error('❌ OCR error:', err);
-    res.json({ success: false, error: 'Kļūda apstrādājot čeku' });
+    res.json({ success: false, error: 'Ошибка обработки чека' });
   }
 });
 
@@ -128,10 +121,10 @@ app.get('/user/checks', authMiddleware, async (req, res) => {
     res.json(checksResult.rows);
   } catch (err) {
     console.error('❌ DB error:', err);
-    res.status(500).json({ error: 'Datubāzes kļūda' });
+    res.status(500).json({ error: 'Ошибка базы данных' });
   }
 });
 
 // ---------- SERVER START ----------
 const PORT = 3000;
-app.listen(PORT, () => console.log(`✅ Serveris darbojas uz http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
