@@ -2,7 +2,7 @@ const openBtn = document.getElementById('registBT');
 const modalContainer = document.getElementById('modalContainer');
 
 openBtn.onclick = async () => {
-  // Загружаем модальное окно с HTML
+  // Загружаем модальное окно
   const response = await fetch('registracijas.html');
   const modalHTML = await response.text();
   modalContainer.innerHTML = modalHTML;
@@ -21,46 +21,44 @@ openBtn.onclick = async () => {
     if (!response.credential) {
       successMsg.style.display = 'block';
       successMsg.style.color = 'red';
-      successMsg.textContent = '❌ Не удалось получить id_token!';
+      successMsg.textContent = 'Не удалось получить id_token!';
       return;
     }
 
+    // Это именно id_token от Google
     const id_token = response.credential;
-    console.log('id_token length:', id_token.length); // для проверки
-    console.log('Отправляем id_token на сервер...');
+    console.log('id_token:', id_token);
 
-    // Отправка id_token на сервер
+    // Отправляем на сервер для авторизации
     fetch(`${window.location.origin}/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id_token })
+      body: JSON.stringify({ id_token }) // отправляем Google token, не токен базы!
     })
-      .then(res => res.json())
-      .then(data => {
-        console.log('Ответ сервера:', data);
-        if (data.success) {
-          localStorage.setItem('user', JSON.stringify(data.user));
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        localStorage.setItem('user', JSON.stringify(data.user));
 
-          successMsg.style.display = 'block';
-          successMsg.style.color = 'green';
-          successMsg.textContent = `✅ Logged in as ${data.user.name} (${data.user.email})`;
+        successMsg.style.display = 'block';
+        successMsg.style.color = 'green';
+        successMsg.textContent = `Logged in as ${data.user.name} (${data.user.email}) ✅`;
 
-          // Переходим на scanner.html
-          setTimeout(() => {
-            window.location.href = 'scanner.html';
-          }, 500);
-        } else {
-          successMsg.style.display = 'block';
-          successMsg.style.color = 'red';
-          successMsg.textContent = data.error || 'Ошибка авторизации';
-        }
-      })
-      .catch(err => {
-        console.error('Ошибка соединения с сервером:', err);
+        setTimeout(() => {
+          window.location.href = 'scanner.html';
+        }, 500);
+      } else {
         successMsg.style.display = 'block';
         successMsg.style.color = 'red';
-        successMsg.textContent = 'Ошибка соединения с сервером';
-      });
+        successMsg.textContent = data.error || 'Ошибка авторизации';
+      }
+    })
+    .catch(err => {
+      console.error('Ошибка соединения с сервером:', err);
+      successMsg.style.display = 'block';
+      successMsg.style.color = 'red';
+      successMsg.textContent = 'Ошибка соединения с сервером';
+    });
   }
 
   // ---------------- Ждём загрузку Google API ----------------
@@ -73,18 +71,14 @@ openBtn.onclick = async () => {
         callback: handleCredentialResponse
       });
 
-      // Рендерим кнопку в контейнере с id="g_id_signin"
       google.accounts.id.renderButton(
         document.getElementById("g_id_signin"),
         { theme: "outline", size: "large" }
       );
-
-      // Можно включить One Tap подсказку
-      // google.accounts.id.prompt();
     }
   }, 300);
 
-  // ---------------- Закрытие модалки при клике вне контента ----------------
+  // Закрытие модалки при клике вне
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.style.display = 'none';
   });
