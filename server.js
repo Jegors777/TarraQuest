@@ -7,7 +7,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import db from './db.js'; // SQLite
+import db from './db.js'; // Turso client
+import dotenv from 'dotenv';
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -23,41 +25,33 @@ app.post('/auth/google', async (req, res) => {
   if (!id_token) return res.status(400).json({ error: 'Nav norādīts token' });
 
   try {
-    const ticket = await client.verifyIdToken({
-      idToken: id_token,
-      audience: CLIENT_ID,
-    });
-
-    const payload = ticket.getPayload();
-    const { sub: googleId, email, name } = payload;
+    const ticket = await client.verifyIdToken({ idToken: id_token, audience: CLIENT_ID });
+    const { sub: googleId, email, name } = ticket.getPayload();
 
     // Проверяем пользователя
-    db.get(`SELECT * FROM users WHERE googleId = ?`, [googleId], (err, existing) => {
-      if (err) return res.status(500).json({ error: 'DB kļūda' });
-
-      if (existing) return res.json({ success: true, user: existing });
-
-      // Проверяем лимит
-      db.get(`SELECT COUNT(*) AS count FROM users`, (err, row) => {
-        if (err) return res.status(500).json({ error: 'DB kļūda' });
-
-        if (row.count >= 5)
-          return res.status(403).json({ error: 'Sasniegts 5 lietotāju limits' });
-
-        // Создаём нового пользователя
-        db.run(
-          `INSERT INTO users (googleId, email, name) VALUES (?, ?, ?)`,
-          [googleId, email, name],
-          function (err) {
-            if (err) return res.status(500).json({ error: 'DB kļūda' });
-
-            db.get(`SELECT * FROM users WHERE id = ?`, [this.lastID], (err, newUser) => {
-              res.json({ success: true, user: newUser });
-            });
-          }
-        );
-      });
+    const result = await db.execute({
+      sql: 'SELECT * FROM users WHERE googleId = ?',
+      args: [googleId]
     });
+    if (result.rows.length > 0) return res.json({ success: true, user: result.rows[0] });
+
+    // Проверяем лимит
+    const countResult = await db.execute({ sql: 'SELECT COUNT(*) AS count FROM users' });
+    if (countResult.rows[0].count >= 5)
+      return res.status(403).json({ error: 'Sasniegts 5 lietotāju limits' });
+
+    // Создаём нового пользователя
+    const insert = await db.execute({
+      sql: 'INSERT INTO users (googleId, email, name) VALUES (?, ?, ?)',
+      args: [googleId, email, name]
+    });
+
+    const newUserResult = await db.execute({
+      sql: 'SELECT * FROM users WHERE id = ?',
+      args: [insert.lastInsertRowid]
+    });
+
+    res.json({ success: true, user: newUserResult.rows[0] });
   } catch (err) {
     console.error('❌ Google Auth kļūda:', err);
     res.status(401).json({ error: 'Nederīgs tokens' });
@@ -71,27 +65,20 @@ function getFileHash(filePath) {
   return crypto.createHash('md5').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-function saveCheckForUser(userId, amount, shop, hash) {
-  return new Promise((resolve, reject) => {
-    const points = Math.round(amount * 10);
-
-    db.run(
-      `INSERT INTO checks (userId, shop, total, points, hash)
-       VALUES (?, ?, ?, ?, ?)`,
-      [userId, shop, amount, points, hash],
-      err => {
-        if (err) return reject(err);
-        resolve(points);
-      }
-    );
+async function saveCheckForUser(userId, amount, shop, hash) {
+  const points = Math.round(amount * 10);
+  await db.execute({
+    sql: 'INSERT INTO checks (userId, shop, total, points, hash) VALUES (?, ?, ?, ?, ?)',
+    args: [userId, shop, amount, points, hash]
   });
+  return points;
 }
 
 app.post('/upload', upload.single('receipt'), async (req, res) => {
+  const imagePath = req.file.path;
+
   try {
-    const imagePath = req.file.path;
-    const result = await Tesseract.recognize(imagePath, 'lav+eng');
-    const text = result.data.text;
+    const { data: { text } } = await Tesseract.recognize(imagePath, 'lav+eng');
 
     const amountMatch = text.match(/(\d{1,4}[.,]\d{1,2})/);
     const amount = amountMatch ? parseFloat(amountMatch[1].replace(',', '.')) : null;
@@ -105,59 +92,46 @@ app.post('/upload', upload.single('receipt'), async (req, res) => {
     }
 
     const { googleId } = req.body;
+    const userResult = await db.execute({ sql: 'SELECT id FROM users WHERE googleId = ?', args: [googleId] });
+    if (userResult.rows.length === 0) {
+      fs.unlinkSync(imagePath);
+      return res.status(404).json({ error: 'Lietotājs nav atrasts.' });
+    }
 
-    db.get(`SELECT id FROM users WHERE googleId = ?`, [googleId], (err, user) => {
-      if (err || !user) {
-        fs.unlinkSync(imagePath);
-        return res.status(404).json({ error: 'Lietotājs nav atrasts.' });
-      }
+    const userId = userResult.rows[0].id;
+    const hash = getFileHash(imagePath);
 
-      const userId = user.id;
-      const hash = getFileHash(imagePath);
+    // Проверка на дубликат
+    const existingResult = await db.execute({ sql: 'SELECT * FROM checks WHERE userId = ? AND hash = ?', args: [userId, hash] });
+    fs.unlinkSync(imagePath);
 
-      // Проверка на дубликат
-      db.get(
-        `SELECT * FROM checks WHERE userId = ? AND hash = ?`,
-        [userId, hash],
-        async (err, existing) => {
-          fs.unlinkSync(imagePath);
+    if (existingResult.rows.length > 0)
+      return res.json({ success: false, error: 'Šis čeks jau ir augšupielādēts.' });
 
-          if (existing)
-            return res.json({ success: false, error: 'Šis čeks jau ir augšupielādēts.' });
-
-          try {
-            const points = await saveCheckForUser(userId, amount, shop, hash);
-            res.json({ success: true, amount, points, shop });
-          } catch (err) {
-            res.json({ success: false, error: 'DB kļūda saglabājot čeku.' });
-          }
-        }
-      );
-    });
+    const points = await saveCheckForUser(userId, amount, shop, hash);
+    res.json({ success: true, amount, points, shop });
   } catch (err) {
+    fs.existsSync(imagePath) && fs.unlinkSync(imagePath);
     console.error('❌ OCR kļūda:', err);
     res.json({ success: false, error: 'Kļūda apstrādājot čeku.' });
   }
 });
 
 // ---------- Все чеки пользователя ----------
-app.get('/user/checks', (req, res) => {
+app.get('/user/checks', async (req, res) => {
   const { googleId } = req.query;
   if (!googleId) return res.status(400).json({ error: 'Nav norādīts lietotājs.' });
 
-  db.get(`SELECT id FROM users WHERE googleId = ?`, [googleId], (err, user) => {
-    if (err || !user)
-      return res.status(404).json({ error: 'Lietotājs nav atrasts.' });
+  try {
+    const userResult = await db.execute({ sql: 'SELECT id FROM users WHERE googleId = ?', args: [googleId] });
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'Lietotājs nav atrasts.' });
 
-    db.all(
-      `SELECT * FROM checks WHERE userId = ? ORDER BY date DESC`,
-      [user.id],
-      (err, rows) => {
-        if (err) return res.status(500).json({ error: 'DB kļūda' });
-        res.json(rows);
-      }
-    );
-  });
+    const checksResult = await db.execute({ sql: 'SELECT * FROM checks WHERE userId = ? ORDER BY date DESC', args: [userResult.rows[0].id] });
+    res.json(checksResult.rows);
+  } catch (err) {
+    console.error('❌ DB kļūda:', err);
+    res.status(500).json({ error: 'Datubāzes kļūda' });
+  }
 });
 
 // ---------- Start server ----------
