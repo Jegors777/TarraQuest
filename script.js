@@ -15,7 +15,7 @@ openBtn.onclick = async () => {
   const CLIENT_ID = '325773790895-3lm9397je2n0lso2nbdds8qopghf3djm.apps.googleusercontent.com';
 
   // ---------------- Google Sign-In Callback ----------------
-  function handleCredentialResponse(response) {
+  async function handleCredentialResponse(response) {
     console.log('Google login response:', response);
 
     if (!response.credential) {
@@ -25,25 +25,28 @@ openBtn.onclick = async () => {
       return;
     }
 
-    // Это именно id_token от Google
+    // Берём только свежий id_token от Google
     const id_token = response.credential;
-    console.log('id_token:', id_token);
+    console.log('id_token (length):', id_token.length);
 
-    // Отправляем на сервер для авторизации
-    fetch(`${window.location.origin}/auth/google`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id_token }) // отправляем Google token, не токен базы!
-    })
-    .then(res => res.json())
-    .then(data => {
+    try {
+      const res = await fetch(`${window.location.origin}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id_token }) // отправляем только Google токен
+      });
+
+      const data = await res.json();
+
       if (data.success) {
+        // Сохраняем данные пользователя
         localStorage.setItem('user', JSON.stringify(data.user));
 
         successMsg.style.display = 'block';
         successMsg.style.color = 'green';
         successMsg.textContent = `Logged in as ${data.user.name} (${data.user.email}) ✅`;
 
+        // Переход на scanner.html
         setTimeout(() => {
           window.location.href = 'scanner.html';
         }, 500);
@@ -52,13 +55,12 @@ openBtn.onclick = async () => {
         successMsg.style.color = 'red';
         successMsg.textContent = data.error || 'Ошибка авторизации';
       }
-    })
-    .catch(err => {
+    } catch (err) {
       console.error('Ошибка соединения с сервером:', err);
       successMsg.style.display = 'block';
       successMsg.style.color = 'red';
       successMsg.textContent = 'Ошибка соединения с сервером';
-    });
+    }
   }
 
   // ---------------- Ждём загрузку Google API ----------------
@@ -75,6 +77,9 @@ openBtn.onclick = async () => {
         document.getElementById("g_id_signin"),
         { theme: "outline", size: "large" }
       );
+
+      // Опционально: включаем One Tap
+      // google.accounts.id.prompt();
     }
   }, 300);
 

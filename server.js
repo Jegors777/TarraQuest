@@ -29,6 +29,8 @@ app.post('/auth/google', async (req, res) => {
     const ticket = await client.verifyIdToken({ idToken: id_token, audience: CLIENT_ID });
     const payload = ticket.getPayload();
 
+    console.log('Payload:', payload);
+
     const { sub: googleId, email, name } = payload;
 
     // Pārbauda, vai lietotājs jau eksistē
@@ -136,6 +138,7 @@ app.get('/user/checks', async (req, res) => {
     res.status(500).json({ error: 'Datubāzes kļūda' });
   }
 });
+
 
 // ---------- SERVERA STARTS ----------
 const PORT = 3000;
