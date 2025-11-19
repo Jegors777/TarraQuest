@@ -5,7 +5,6 @@ import Tesseract from 'tesseract.js';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { OAuth2Client } from 'google-auth-library';
 import jwt from 'jsonwebtoken';
 import db from './db.js';
 import dotenv from 'dotenv';
@@ -16,54 +15,70 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.resolve('.')));
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT = new OAuth2Client(CLIENT_ID);
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret123';
 
-// ---------- GOOGLE AUTH ----------
+// ---------- GOOGLE AUTH (БЕЗ ПРОВЕРКИ id_token) ----------
 app.post('/auth/google', async (req, res) => {
   const { id_token } = req.body;
   if (!id_token) return res.status(400).json({ error: 'Нет id_token' });
 
   try {
-    const ticket = await GOOGLE_CLIENT.verifyIdToken({ idToken: id_token, audience: CLIENT_ID });
-    const payload = ticket.getPayload();
-    const { sub: googleId, email, name } = payload;
+    // ---------------------------------------------
+    // ❗ ВРЕМЕННЫЙ ОБХОД: не проверяем id_token
+    // ---------------------------------------------
+    const googleId = 'test-google-id';
+    const email = 'test@test.com';
+    const name = 'Test User';
 
-    // Создаём пользователя, если его нет
-    let result = await db.execute({ sql: 'SELECT * FROM users WHERE googleId = ?', args: [googleId] });
+    // Ищем пользователя в БД
+    let result = await db.execute({
+      sql: 'SELECT * FROM users WHERE googleId = ?',
+      args: [googleId]
+    });
+
     let user;
     if (result.rows.length > 0) {
       user = result.rows[0];
     } else {
-      const insert = await db.execute({ sql: 'INSERT INTO users (googleId, email, name) VALUES (?, ?, ?)', args: [googleId, email, name] });
-      user = (await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [insert.lastInsertRowid] })).rows[0];
+      // создаём тестового пользователя
+      const insert = await db.execute({
+        sql: 'INSERT INTO users (googleId, email, name) VALUES (?, ?, ?)',
+        args: [googleId, email, name]
+      });
+
+      user = (
+        await db.execute({
+          sql: 'SELECT * FROM users WHERE id = ?',
+          args: [insert.lastInsertRowid]
+        })
+      ).rows[0];
     }
 
-    // Создаём внутренний JWT
+    // создаём внутренний JWT
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
 
     res.json({ success: true, user, token });
+
   } catch (err) {
-    console.error('❌ Google auth error:', err);
-    res.status(401).json({ error: 'Неверный id_token' });
+    console.error('❌ Fake Google auth error:', err);
+    res.status(500).json({ error: 'Ошибка авторизации (fake mode)' });
   }
 });
 
 // ---------- JWT middleware ----------
 function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
-  if (!authHeader) return res.status(401).json({ error: 'No token provided' });
+  if (!authHeader) return res.status(401).json({ error: 'Нет токена' });
 
   const token = authHeader.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'No token provided' });
+  if (!token) return res.status(401).json({ error: 'Нет токена' });
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.userId = decoded.userId;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: 'Неверный токен' });
   }
 }
 
@@ -76,7 +91,10 @@ function getFileHash(filePath) {
 
 async function saveCheckForUser(userId, amount, shop, hash) {
   const points = Math.round(amount * 10);
-  await db.execute({ sql: 'INSERT INTO checks (userId, shop, total, points, hash) VALUES (?, ?, ?, ?, ?)', args: [userId, shop, amount, points, hash] });
+  await db.execute({
+    sql: 'INSERT INTO checks (userId, shop, total, points, hash) VALUES (?, ?, ?, ?, ?)',
+    args: [userId, shop, amount, points, hash]
+  });
   return points;
 }
 
@@ -100,13 +118,19 @@ app.post('/upload', authMiddleware, upload.single('receipt'), async (req, res) =
     const userId = req.userId;
     const hash = getFileHash(imagePath);
 
-    const existingResult = await db.execute({ sql: 'SELECT * FROM checks WHERE userId = ? AND hash = ?', args: [userId, hash] });
+    const existingResult = await db.execute({
+      sql: 'SELECT * FROM checks WHERE userId = ? AND hash = ?',
+      args: [userId, hash]
+    });
+
     fs.unlinkSync(imagePath);
 
-    if (existingResult.rows.length > 0) return res.json({ success: false, error: 'Этот чек уже загружен' });
+    if (existingResult.rows.length > 0)
+      return res.json({ success: false, error: 'Этот чек уже загружен' });
 
     const points = await saveCheckForUser(userId, amount, shop, hash);
     res.json({ success: true, amount, points, shop });
+
   } catch (err) {
     fs.existsSync(imagePath) && fs.unlinkSync(imagePath);
     console.error('❌ OCR error:', err);
@@ -117,7 +141,11 @@ app.post('/upload', authMiddleware, upload.single('receipt'), async (req, res) =
 // ---------- GET USER CHECKS ----------
 app.get('/user/checks', authMiddleware, async (req, res) => {
   try {
-    const checksResult = await db.execute({ sql: 'SELECT * FROM checks WHERE userId = ? ORDER BY date DESC', args: [req.userId] });
+    const checksResult = await db.execute({
+      sql: 'SELECT * FROM checks WHERE userId = ? ORDER BY date DESC',
+      args: [req.userId]
+    });
+
     res.json(checksResult.rows);
   } catch (err) {
     console.error('❌ DB error:', err);
@@ -127,4 +155,4 @@ app.get('/user/checks', authMiddleware, async (req, res) => {
 
 // ---------- SERVER START ----------
 const PORT = 3000;
-app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ Fake Google server running on http://localhost:${PORT}`));
