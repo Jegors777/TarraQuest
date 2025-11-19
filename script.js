@@ -16,7 +16,14 @@ openBtn.onclick = async () => {
 
   // ---------------- Google Sign-In Callback ----------------
   function handleCredentialResponse(response) {
-    console.log('Google login response:', response); // проверяем токен в консоли
+    console.log('Google login response:', response);
+    if (!response.credential) {
+      successMsg.style.display = 'block';
+      successMsg.style.color = 'red';
+      successMsg.textContent = 'Не удалось получить id_token!';
+      return;
+    }
+
     const id_token = response.credential;
     console.log('id_token:', id_token);
 
@@ -32,19 +39,18 @@ openBtn.onclick = async () => {
         // Сохраняем пользователя в localStorage
         localStorage.setItem('user', JSON.stringify(data.user));
 
-        // Показываем сообщение об успешном входе
         successMsg.style.display = 'block';
         successMsg.style.color = 'green';
         successMsg.textContent = `Logged in as ${data.user.name} (${data.user.email}) ✅`;
 
-        // Редирект на scanner.html после успешного входа
+        // Переходим на scanner.html
         setTimeout(() => {
           window.location.href = 'scanner.html';
         }, 500);
       } else {
         successMsg.style.display = 'block';
         successMsg.style.color = 'red';
-        successMsg.textContent = data.error || 'Error';
+        successMsg.textContent = data.error || 'Ошибка авторизации';
       }
     })
     .catch(err => {
@@ -55,29 +61,28 @@ openBtn.onclick = async () => {
     });
   }
 
-  // ---------------- Загрузка Google Identity Services ----------------
+  // ---------------- Ждём загрузку Google API ----------------
   const waitForGoogle = setInterval(() => {
     if (window.google && google.accounts && google.accounts.id) {
       clearInterval(waitForGoogle);
 
-      // Инициализация Google Sign-In
       google.accounts.id.initialize({
         client_id: CLIENT_ID,
         callback: handleCredentialResponse
       });
 
-      // Рендерим кнопку в контейнере с id="g_id_signin"
+      // Рендер кнопки
       google.accounts.id.renderButton(
         document.getElementById("g_id_signin"),
         { theme: "outline", size: "large" }
       );
 
-      // Опционально: показываем подсказку One Tap
+      // Можно активировать One Tap
       // google.accounts.id.prompt();
     }
   }, 300);
 
-  // ---------------- Закрытие модалки при клике вне контента ----------------
+  // ---------------- Закрытие модалки при клике вне ----------------
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.style.display = 'none';
   });
