@@ -32,8 +32,7 @@ openBtn.onclick = async () => {
       const data = await res.json();
 
       if (data.success) {
-        // Сохраняем JWT
-        localStorage.setItem('token', data.token);
+        // Сохраняем данные пользователя
         localStorage.setItem('user', JSON.stringify(data.user));
 
         successMsg.style.display = 'block';
@@ -47,7 +46,7 @@ openBtn.onclick = async () => {
         successMsg.textContent = data.error || 'Ошибка авторизации';
       }
     } catch (err) {
-      console.error('Server connection error:', err);
+      console.error('Ошибка соединения с сервером:', err);
       successMsg.style.display = 'block';
       successMsg.style.color = 'red';
       successMsg.textContent = 'Ошибка соединения с сервером';
