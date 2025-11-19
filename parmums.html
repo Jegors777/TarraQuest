@@ -1,17 +1,83 @@
-<!DOCTYPE html>
-<html lang="ru">
+<!doctype html>
+<html lang="lv">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Par Mums | Tarra Quest</title>
-  <link id="theme-link" rel="stylesheet" href="ParMumsStyle.css">
-  
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sociālie tīkli</title>
+
+  <style>
+    .social-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 15px;
+      text-decoration: none;
+      font-family: system-ui, sans-serif;
+      color: #000;
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 50px; /* mazāks nekā iepriekš */
+      font-weight: 600;
+      transition: 0.15s;
+    }
+
+    .social-link:hover {
+      background: rgba(0,0,0,0.08);
+      transform: translateY(-2px);
+    }
+
+    .social-logo {
+      width: 70px;
+      height: 70px;
+      object-fit: contain;
+    }
+
+    /* Atpakaļ poga */
+    .back-btn {
+      display: inline-block;
+      margin-top: 40px;
+      padding: 16px 22px;
+      background: #e0e0e0;
+      color: #000;
+      text-decoration: none;
+      font-size: 40px;
+      border-radius: 12px;
+      transition: 0.15s;
+    }
+    .back-btn:hover {
+      background: #cfcfcf;
+      transform: translateY(-2px);
+    }
+  </style>
+
 </head>
 <body>
-<h1>Te vēl nekas nav 🤷‍♂️ </h1>
 
+  <!-- Instagram -->
+  <a class="social-link" href="https://www.instagram.com/tarraquest_smu?igsh=MXF0ZGI2eWU4em13Yw%3D%3D&utm_source=qr" target="_blank" rel="noopener noreferrer">
+    <img src="instalogo.webp" alt="Instagram logo" class="social-logo">
+    <span>Instagram</span>
+  </a>
 
-<a href="scanner.html" class="back-link">← Atpakaļ uz sākumu</a>
-<!--<script src="script.js"></script>-->
+  <br><br>
+
+  <!-- TikTok -->
+  <a class="social-link" href="https://www.tiktok.com/@tarraquest_smu?_r=1&_t=ZN-91KcX1nvHtO" target="_blank" rel="noopener noreferrer">
+    <img src="ttlogo.png" alt="TikTok logo" class="social-logo">
+    <span>TikTok</span>
+  </a>
+
+  <br><br>
+
+  <!-- Ja Latvia katalogs -->
+  <a class="social-link" href="https://jalatvia.lv/katalogs/tarraquest" target="_blank" rel="noopener noreferrer">
+    <img src="jalatvialogo.jpg" alt="Ja Latvia logo" class="social-logo">
+    <span>JA Latvia katalogs</span>
+  </a>
+
+  <br><br>
+
+  <!-- Atpakaļ -->
+  <a href="scanner.html" class="back-btn">← Atpakaļ</a>
+
 </body>
 </html>

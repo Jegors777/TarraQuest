@@ -15,7 +15,7 @@ body {
   color: #000000;
 
   /* фон */
-  background-image: url("newTarraQuest.jpg");
+  background-image: url("leaderboardimg.png");
   background-repeat: no-repeat;       /* не повторять картинку */
   background-position: center top;    /* положение картинки */
   background-size: 100% auto              /* сохраняем оригинальный размер */
