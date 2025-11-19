@@ -16,8 +16,6 @@ openBtn.onclick = async () => {
 
   // ---------------- Google Sign-In Callback ----------------
   async function handleCredentialResponse(response) {
-    console.log('Google login response:', response);
-
     if (!response.credential) {
       successMsg.style.display = 'block';
       successMsg.style.color = 'red';
@@ -25,21 +23,21 @@ openBtn.onclick = async () => {
       return;
     }
 
-    // Берём только свежий id_token от Google
     const id_token = response.credential;
-    console.log('id_token (length):', id_token.length);
 
     try {
+      // Отправляем Google id_token на сервер для проверки и получения внутреннего JWT
       const res = await fetch(`${window.location.origin}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id_token }) // отправляем только Google токен
+        body: JSON.stringify({ id_token })
       });
 
       const data = await res.json();
 
-      if (data.success) {
-        // Сохраняем данные пользователя
+      if (data.success && data.token) {
+        // Сохраняем JWT и данные пользователя в localStorage
+        localStorage.setItem('jwt', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
 
         successMsg.style.display = 'block';
@@ -78,7 +76,7 @@ openBtn.onclick = async () => {
         { theme: "outline", size: "large" }
       );
 
-      // Опционально: включаем One Tap
+      // При желании можно включить One Tap
       // google.accounts.id.prompt();
     }
   }, 300);
@@ -88,3 +86,48 @@ openBtn.onclick = async () => {
     if (e.target === modal) modal.style.display = 'none';
   });
 };
+
+// ---------------- Функции для запросов с JWT ----------------
+
+// Получение чеков пользователя
+async function getUserChecks() {
+  const token = localStorage.getItem('jwt');
+  if (!token) throw new Error('Нет авторизации');
+
+  const res = await fetch('/user/checks', {
+    headers: {
+      'Authorization': `Bearer ${token}`
+    }
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Ошибка запроса чеков');
+  }
+
+  return res.json();
+}
+
+// Загрузка чека (файл)
+async function uploadReceipt(file) {
+  const token = localStorage.getItem('jwt');
+  if (!token) throw new Error('Нет авторизации');
+
+  const formData = new FormData();
+  formData.append('receipt', file);
+
+  const res = await fetch('/upload', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`
+    },
+    body: formData
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Ошибка загрузки чека');
+  }
+
+  return res.json();
+}
