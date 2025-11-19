@@ -1,76 +1,53 @@
+html, body {
+  height: 100%;  /* ensures full height coverage */
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: Arial, sans-serif;
-  background-color: rgb(22, 130, 0);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  margin: 0;
   text-align: center;
   font-size: 20px;
   font-weight: bold;
   margin-top: 100px;
   color: #000000;
+  background-image: url("backgroundgpt.png");
 
-  /* фон */
-  background-image: url("newTarraQuest.jpg");
-  background-repeat: no-repeat;       /* не повторять картинку */
-  background-position: center top;    /* положение картинки */
-  background-size: 100% auto              /* сохраняем оригинальный размер */
+  /* ✅ Make image fill the screen without cropping or white borders */
+  background-size: cover;         /* fills screen proportionally */
+  background-position: center;    /* keeps centered */
+  background-repeat: no-repeat;   /* prevents repeating */
+  background-attachment: scroll;  /* allows scrolling */
 }
 
+/* --- Buttons --- */
+#registBT, #registerBtn {
+  padding: 30px 35px;
+  font-size: 40px;
+  font-weight: bold;
+  background-color: rgba(231, 211, 120); /* original color preserved */
+  font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;
+  color: rgba(60, 59, 56); /* 🔴 text color changed to red */
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
 
+/* Individual button margins */
 #registBT {
-  padding: 15px 25px;
-  margin-top: -50px;
-  font-size: 18px;
-  font-weight: bold;
-  background-color: rgb(99, 255, 15);
-  color: #000000;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+  margin-top: 200px;
 }
 
+/* Hover effects */
 #registBT:hover {
-  background-color: rgb(24, 68, 0);
-}
-
-#registerBtn {
-  padding: 15px 25px;
-  font-size: 18px;
-  font-weight: bold;
-  background-color: rgb(99, 255, 15);
-  color: #000000;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
+  background-color: rgba(89, 157, 38);
 }
 
 #registerBtn:hover {
-  background-color: rgb(22, 130, 0);
-}
-/* Окно регистрации */
-.modal-content {
-  background-color: rgb(24, 68, 0);
-  padding: 20px;
-  border-radius: 10px;
-  width: 50%; /* половина страницы */
-  max-width: 500px;
-  text-align: center;
+  background-color: rgba(89, 157, 38);
 }
 
-/* Поля ввода */
-.modal-content input {
-  width: 80%;
-  padding: 10px;
-  margin: 10px 0;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
-
-
+/* --- Modal window --- */
 .modal {
   display: none;
   position: fixed;
@@ -78,4 +55,23 @@ body {
   justify-content: center;
   align-items: center;
   background: rgba(255, 255, 255, 0.6);
+}
+
+/* --- Modal content --- */
+.modal-content {
+  background-color: rgba(89, 157, 38);
+  padding: 10px;
+  border-radius: 10px;
+  width: 50%;
+  max-width: 450px;
+  text-align: center;
+}
+
+/* --- Input fields --- */
+.modal-content input {
+  width: 80%;
+  padding: 10px;
+  margin: 10px 0;
+  border-radius: 5px;
+  border: 1px solid #ccc;
 }
