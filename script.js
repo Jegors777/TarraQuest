@@ -14,13 +14,17 @@ openBtn.onclick = async () => {
 
   const CLIENT_ID = '325773790895-3lm9397je2n0lso2nbdds8qopghf3djm.apps.googleusercontent.com';
 
-  // Callback для обработки ответа Google
+  // ---------------- Google Sign-In Callback ----------------
   function handleCredentialResponse(response) {
+    console.log('Google login response:', response); // проверяем токен в консоли
+    const id_token = response.credential;
+    console.log('id_token:', id_token);
+
     // Отправка id_token на сервер
     fetch(`${window.location.origin}/auth/google`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id_token: response.credential })
+      body: JSON.stringify({ id_token })
     })
     .then(res => res.json())
     .then(data => {
@@ -36,7 +40,7 @@ openBtn.onclick = async () => {
         // Редирект на scanner.html после успешного входа
         setTimeout(() => {
           window.location.href = 'scanner.html';
-        }, 500); // можно уменьшить задержку, если хотите
+        }, 500);
       } else {
         successMsg.style.display = 'block';
         successMsg.style.color = 'red';
@@ -51,7 +55,7 @@ openBtn.onclick = async () => {
     });
   }
 
-  // Ждём загрузку Google API
+  // ---------------- Загрузка Google Identity Services ----------------
   const waitForGoogle = setInterval(() => {
     if (window.google && google.accounts && google.accounts.id) {
       clearInterval(waitForGoogle);
@@ -62,15 +66,18 @@ openBtn.onclick = async () => {
         callback: handleCredentialResponse
       });
 
-      // Рендерим кнопку
+      // Рендерим кнопку в контейнере с id="g_id_signin"
       google.accounts.id.renderButton(
         document.getElementById("g_id_signin"),
         { theme: "outline", size: "large" }
       );
+
+      // Опционально: показываем подсказку One Tap
+      // google.accounts.id.prompt();
     }
   }, 300);
 
-  // Закрытие модалки при клике вне контента
+  // ---------------- Закрытие модалки при клике вне контента ----------------
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.style.display = 'none';
   });
