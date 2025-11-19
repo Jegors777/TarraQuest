@@ -22,13 +22,18 @@ const client = new OAuth2Client(CLIENT_ID);
 // ---------- GOOGLE AUTH ----------
 app.post('/auth/google', async (req, res) => {
   const { id_token } = req.body;
-  if (!id_token) return res.status(400).json({ error: 'Nav norādīts token' });
+  if (!id_token) return res.status(400).json({ error: 'Не передан токен' });
 
   try {
+    // Валидируем id_token через Google
     const ticket = await client.verifyIdToken({ idToken: id_token, audience: CLIENT_ID });
-    const { sub: googleId, email, name } = ticket.getPayload();
+    const payload = ticket.getPayload();
 
-    // Проверяем пользователя
+    console.log('✅ Google ID Token Payload:', payload); // Полный вывод payload для дебага
+
+    const { sub: googleId, email, name } = payload;
+
+    // Проверяем, есть ли уже пользователь
     const result = await db.execute({
       sql: 'SELECT * FROM users WHERE googleId = ?',
       args: [googleId]
@@ -38,7 +43,7 @@ app.post('/auth/google', async (req, res) => {
     // Проверяем лимит
     const countResult = await db.execute({ sql: 'SELECT COUNT(*) AS count FROM users' });
     if (countResult.rows[0].count >= 5)
-      return res.status(403).json({ error: 'Sasniegts 5 lietotāju limits' });
+      return res.status(403).json({ error: 'Достигнут лимит 5 пользователей' });
 
     // Создаём нового пользователя
     const insert = await db.execute({
@@ -53,8 +58,8 @@ app.post('/auth/google', async (req, res) => {
 
     res.json({ success: true, user: newUserResult.rows[0] });
   } catch (err) {
-    console.error('❌ Google Auth kļūda:', err);
-    res.status(401).json({ error: 'Nederīgs tokens' });
+    console.error('❌ Ошибка Google Auth:', err);
+    res.status(401).json({ error: 'Неверный id_token' });
   }
 });
 
@@ -88,14 +93,14 @@ app.post('/upload', upload.single('receipt'), async (req, res) => {
 
     if (!amount) {
       fs.unlinkSync(imagePath);
-      return res.json({ success: false, error: 'Neizdevās nolasīt summu.' });
+      return res.json({ success: false, error: 'Не удалось считать сумму' });
     }
 
     const { googleId } = req.body;
     const userResult = await db.execute({ sql: 'SELECT id FROM users WHERE googleId = ?', args: [googleId] });
     if (userResult.rows.length === 0) {
       fs.unlinkSync(imagePath);
-      return res.status(404).json({ error: 'Lietotājs nav atrasts.' });
+      return res.status(404).json({ error: 'Пользователь не найден' });
     }
 
     const userId = userResult.rows[0].id;
@@ -106,34 +111,34 @@ app.post('/upload', upload.single('receipt'), async (req, res) => {
     fs.unlinkSync(imagePath);
 
     if (existingResult.rows.length > 0)
-      return res.json({ success: false, error: 'Šis čeks jau ir augšupielādēts.' });
+      return res.json({ success: false, error: 'Этот чек уже загружен' });
 
     const points = await saveCheckForUser(userId, amount, shop, hash);
     res.json({ success: true, amount, points, shop });
   } catch (err) {
     fs.existsSync(imagePath) && fs.unlinkSync(imagePath);
-    console.error('❌ OCR kļūda:', err);
-    res.json({ success: false, error: 'Kļūda apstrādājot čeku.' });
+    console.error('❌ OCR ошибка:', err);
+    res.json({ success: false, error: 'Ошибка при обработке чека' });
   }
 });
 
 // ---------- Все чеки пользователя ----------
 app.get('/user/checks', async (req, res) => {
   const { googleId } = req.query;
-  if (!googleId) return res.status(400).json({ error: 'Nav norādīts lietotājs.' });
+  if (!googleId) return res.status(400).json({ error: 'Не указан пользователь' });
 
   try {
     const userResult = await db.execute({ sql: 'SELECT id FROM users WHERE googleId = ?', args: [googleId] });
-    if (userResult.rows.length === 0) return res.status(404).json({ error: 'Lietotājs nav atrasts.' });
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'Пользователь не найден' });
 
     const checksResult = await db.execute({ sql: 'SELECT * FROM checks WHERE userId = ? ORDER BY date DESC', args: [userResult.rows[0].id] });
     res.json(checksResult.rows);
   } catch (err) {
-    console.error('❌ DB kļūda:', err);
-    res.status(500).json({ error: 'Datubāzes kļūda' });
+    console.error('❌ Ошибка БД:', err);
+    res.status(500).json({ error: 'Ошибка базы данных' });
   }
 });
 
 // ---------- Start server ----------
 const PORT = 3000;
-app.listen(PORT, () => console.log(`✅ Serveris darbojas uz http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ Сервер запущен на http://localhost:${PORT}`));
